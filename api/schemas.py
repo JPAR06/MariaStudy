@@ -1,0 +1,187 @@
+"""Pydantic models for all API request/response contracts."""
+from __future__ import annotations
+from typing import Any
+from pydantic import BaseModel
+
+
+# ── Subjects ──────────────────────────────────────────────────────────────────
+
+class SubjectCreate(BaseModel):
+    name: str
+
+
+class FileRecord(BaseModel):
+    name: str
+    pages: int = 0
+    type: str = "notes"  # "notes" | "exercises"
+
+
+class SubjectResponse(BaseModel):
+    id: str
+    name: str
+    created_at: str
+    files: list[FileRecord] = []
+    topics: list[str] = []
+    summary: str = ""
+
+
+# ── Files ─────────────────────────────────────────────────────────────────────
+
+class FileTypeUpdate(BaseModel):
+    file_type: str  # "notes" | "exercises"
+
+
+class IngestResult(BaseModel):
+    chunks: int
+    filename: str
+
+
+# ── Q&A ───────────────────────────────────────────────────────────────────────
+
+class AskRequest(BaseModel):
+    question: str
+    topic_filter: str | None = None
+
+
+class Source(BaseModel):
+    file: str
+    page: int
+
+
+class AskResponse(BaseModel):
+    answer: str
+    sources: list[Source]
+
+
+class SearchRequest(BaseModel):
+    question: str
+    top_k: int = 3
+
+
+class SearchResult(BaseModel):
+    subject_id: str
+    subject_name: str
+    best_distance: float
+    chunks: list[dict[str, Any]]
+
+
+# ── Flashcards ────────────────────────────────────────────────────────────────
+
+class FlashcardBase(BaseModel):
+    frente: str
+    verso: str
+    fonte: str = ""
+    card_type: str = "basic"  # "basic" | "cloze"
+
+
+class FlashcardInDB(FlashcardBase):
+    interval: int = 1
+    ease: float = 2.5
+    reps: int = 0
+    last_reviewed: str | None = None
+    next_review: str = ""
+    favorite: bool = False
+    status: str = "nova"  # "nova"|"a aprender"|"para rever"|"dominada"
+
+
+class FlashcardGenerateRequest(BaseModel):
+    topic: str
+    n: int = 5
+
+
+class FlashcardGenerateResponse(BaseModel):
+    flashcards: list[FlashcardBase]
+
+
+class FlashcardResultRequest(BaseModel):
+    card: dict[str, Any]  # full card dict (frente, verso, fonte, card_type)
+    result: str           # "again" | "hard" | "good" | "easy"
+
+
+class FlashcardFavoriteRequest(BaseModel):
+    card: dict[str, Any]
+
+
+class FlashcardImportRequest(BaseModel):
+    text: str  # raw tab/semicolon/Anki cloze text
+
+
+class FlashcardImportResponse(BaseModel):
+    imported: int
+
+
+# ── Quiz ──────────────────────────────────────────────────────────────────────
+
+class QuizGenerateRequest(BaseModel):
+    topic: str
+    n: int = 5
+    difficulty: str = "Médio"  # "Fácil" | "Médio" | "Difícil"
+
+
+class QuizQuestion(BaseModel):
+    pergunta: str
+    opcoes: list[str]   # ["A) ...", "B) ...", "C) ...", "D) ..."]
+    correta: int        # 0-3 index
+    explicacao: str
+    fonte: str
+
+
+class QuizGenerateResponse(BaseModel):
+    questoes: list[QuizQuestion]
+
+
+class QuizResultRequest(BaseModel):
+    topic: str
+    score: int
+    total: int
+
+
+# ── Progress ──────────────────────────────────────────────────────────────────
+
+class QuizAttempt(BaseModel):
+    date: str
+    topic: str
+    score: int
+    total: int
+    pct: float
+
+
+class TopicStat(BaseModel):
+    topic: str
+    attempts: int
+    avg_pct: float
+    last_date: str
+
+
+class SRSStats(BaseModel):
+    total: int
+    due: int
+    mastered: int
+    learning: int
+    new: int
+    favorites: int
+
+
+class ProgressResponse(BaseModel):
+    quiz_history: list[QuizAttempt]
+    topic_stats: list[TopicStat]
+    srs_stats: SRSStats
+    file_stats: dict[str, Any]  # total_files, total_pages, total_chunks
+
+
+# ── Daily Digest ──────────────────────────────────────────────────────────────
+
+class DigestQuestionOfDay(BaseModel):
+    frente: str
+    verso: str
+    fonte: str
+    card_type: str
+    subject_name: str
+
+
+class DigestResponse(BaseModel):
+    streak: int
+    due_total: int
+    weak_topic: str | None
+    weak_topic_subject: str | None
+    question_of_day: DigestQuestionOfDay | None

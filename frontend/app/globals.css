@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* iOS / Apple-inspired light palette */
+    --background: 240 5% 97%;       /* #F5F5F7 */
+    --foreground: 0 0% 11%;         /* #1D1D1F */
+    --card: 0 0% 100%;              /* #FFFFFF */
+    --card-foreground: 0 0% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 11%;
+    --primary: 211 100% 50%;        /* #007AFF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 0 0% 11%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 3% 44%; /* #6E6E73 */
+    --accent: 211 100% 95%;
+    --accent-foreground: 211 100% 40%;
+    --destructive: 0 72% 51%;       /* #FF3B30 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;           /* #E5E5EA */
+    --input: 240 6% 90%;
+    --ring: 211 100% 50%;
+    --radius: 0.875rem;             /* 14px */
+    /* Custom semantic */
+    --surface: 0 0% 100%;
+    --elevated: 240 5% 94%;
+    --success: 142 71% 45%;         /* #34C759 */
+    --warning: 45 100% 50%;         /* #FFD60A */
+    --danger: 4 86% 58%;            /* #FF453A */
+  }
+
+  .dark {
+    /* iOS dark palette */
+    --background: 0 0% 0%;          /* #000000 */
+    --foreground: 240 5% 96%;       /* #F5F5F7 */
+    --card: 240 3% 11%;             /* #1C1C1E */
+    --card-foreground: 240 5% 96%;
+    --popover: 240 3% 11%;
+    --popover-foreground: 240 5% 96%;
+    --primary: 211 100% 53%;        /* #0A84FF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 3% 17%;        /* #2C2C2E */
+    --secondary-foreground: 240 5% 96%;
+    --muted: 240 3% 17%;
+    --muted-foreground: 240 5% 64%; /* rgba(255,255,255,0.45) */
+    --accent: 211 100% 20%;
+    --accent-foreground: 211 100% 70%;
+    --destructive: 4 86% 58%;       /* #FF453A */
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 100% / 0.08;     /* rgba(255,255,255,0.08) */
+    --input: 240 3% 17%;
+    --ring: 211 100% 53%;
+    --surface: 240 3% 11%;
+    --elevated: 240 3% 17%;
+    --success: 142 71% 45%;
+    --warning: 45 100% 50%;
+    --danger: 4 86% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ── Backface visibility utility (flashcard flip) ── */
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ── Custom scrollbar (minimal) ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* ── Prose override for markdown content ── */
+.prose {
+  max-width: none;
+  color: hsl(var(--foreground));
+}
+.prose strong {
+  color: hsl(var(--foreground));
+}
+.prose code {
+  font-size: 0.875em;
+  background: hsl(var(--muted));
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}

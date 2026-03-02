@@ -1,14 +1,39 @@
 services:
-  mariastudy:
+  # ── Streamlit (kept during transition) ──────────────────────────────────────
+  streamlit:
     build: .
+    command: streamlit run app.py --server.port 8502 --server.address 0.0.0.0
     ports:
       - "8502:8502"
     volumes:
-      # Data (ChromaDB, uploads, JSON files) persists on the host
       - ./data:/app/data
-      # Code mounted — changes only need docker compose restart (no rebuild)
       - ./app.py:/app/app.py
       - ./src:/app/src
+    env_file: .env
+    restart: unless-stopped
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./api:/app/api
+    env_file: .env
+    restart: unless-stopped
+
+  # ── Next.js frontend ─────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
     environment:
-      - GROQ_API_KEY=${GROQ_API_KEY}
+      - NEXT_PUBLIC_API_URL=http://api:8000
+    depends_on:
+      - api
     restart: unless-stopped
