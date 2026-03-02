@@ -1,0 +1,14 @@
+services:
+  mariastudy:
+    build: .
+    ports:
+      - "8502:8502"
+    volumes:
+      # Data (ChromaDB, uploads, JSON files) persists on the host
+      - ./data:/app/data
+      # Code mounted — changes only need docker compose restart (no rebuild)
+      - ./app.py:/app/app.py
+      - ./src:/app/src
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    restart: unless-stopped

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install -r requirements.txt)",
+      "Bash(streamlit run app.py)",
+      "Bash(pip show pyngrok)",
+      "Bash(pip install pyngrok -q)",
+      "Bash(docker compose build)",
+      "Bash(docker compose restart)",
+      "Bash(docker compose exec mariastudy grep -n \"get_deck_cards\" /app/src/progress.py)",
+      "Bash(docker compose exec mariastudy sh -c \"grep -n get_deck_cards //app/src/progress.py\")",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 75008\")",
+      "Bash(tasklist /FI \"PID eq 71084\")",
+      "Bash(powershell -Command \"Get-Process -Id 75008,71084 | Select-Object Id,Name,Path\")",
+      "Bash(powershell -Command \"Stop-Process -Id 75008 -Force\")",
+      "Bash(docker compose exec mariastudy sh -c \"grep -c ''Inter'' //app/app.py && grep -c ''data-theme'' //app/app.py\")",
+      "Bash(git init)",
+      "Bash(git add .)"
+    ]
+  }
+}

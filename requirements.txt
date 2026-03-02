@@ -1,0 +1,10 @@
+streamlit>=1.32
+groq
+chromadb
+sentence-transformers
+pdfplumber
+PyMuPDF
+python-dotenv
+Pillow
+plotly
+rank-bm25
