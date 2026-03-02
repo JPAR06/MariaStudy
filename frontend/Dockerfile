@@ -24,7 +24,6 @@ ENV PORT=3000
 
 COPY --from=base /app/.next/standalone ./
 COPY --from=base /app/.next/static ./.next/static
-COPY --from=base /app/public ./public
 
 EXPOSE 3000
 

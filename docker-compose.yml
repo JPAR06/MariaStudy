@@ -1,17 +1,4 @@
 services:
-  # ── Streamlit (kept during transition) ──────────────────────────────────────
-  streamlit:
-    build: .
-    command: streamlit run app.py --server.port 8502 --server.address 0.0.0.0
-    ports:
-      - "8502:8502"
-    volumes:
-      - ./data:/app/data
-      - ./app.py:/app/app.py
-      - ./src:/app/src
-    env_file: .env
-    restart: unless-stopped
-
   # ── FastAPI backend ──────────────────────────────────────────────────────────
   api:
     build: .
