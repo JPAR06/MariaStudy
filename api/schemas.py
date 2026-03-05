@@ -1,10 +1,10 @@
-"""Pydantic models for all API request/response contracts."""
+﻿"""Pydantic models for all API request/response contracts."""
 from __future__ import annotations
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel
 
 
-# ── Subjects ──────────────────────────────────────────────────────────────────
+# â”€â”€ Subjects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class SubjectCreate(BaseModel):
     name: str
@@ -13,7 +13,8 @@ class SubjectCreate(BaseModel):
 class FileRecord(BaseModel):
     name: str
     pages: int = 0
-    type: str = "notes"  # "notes" | "exercises"
+    type: Literal["notes", "exercises"] = "notes"
+    topics: list[str] = []
 
 
 class SubjectResponse(BaseModel):
@@ -23,12 +24,18 @@ class SubjectResponse(BaseModel):
     files: list[FileRecord] = []
     topics: list[str] = []
     summary: str = ""
+    topic_summaries: dict[str, str] = {}
+    status: Literal["active", "finished"] = "active"
 
 
-# ── Files ─────────────────────────────────────────────────────────────────────
+class SubjectStatusUpdate(BaseModel):
+    status: Literal["active", "finished"]
+
+
+# â”€â”€ Files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class FileTypeUpdate(BaseModel):
-    file_type: str  # "notes" | "exercises"
+    file_type: Literal["notes", "exercises"]
 
 
 class IngestResult(BaseModel):
@@ -36,7 +43,7 @@ class IngestResult(BaseModel):
     filename: str
 
 
-# ── Q&A ───────────────────────────────────────────────────────────────────────
+# â”€â”€ Q&A â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class AskRequest(BaseModel):
     question: str
@@ -65,7 +72,7 @@ class SearchResult(BaseModel):
     chunks: list[dict[str, Any]]
 
 
-# ── Flashcards ────────────────────────────────────────────────────────────────
+# â”€â”€ Flashcards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class FlashcardBase(BaseModel):
     frente: str
@@ -86,6 +93,7 @@ class FlashcardInDB(FlashcardBase):
 
 class FlashcardGenerateRequest(BaseModel):
     topic: str
+    topics: list[str] | None = None
     n: int = 5
 
 
@@ -95,7 +103,7 @@ class FlashcardGenerateResponse(BaseModel):
 
 class FlashcardResultRequest(BaseModel):
     card: dict[str, Any]  # full card dict (frente, verso, fonte, card_type)
-    result: str           # "again" | "hard" | "good" | "easy"
+    result: Literal["again", "hard", "good", "easy"]
 
 
 class FlashcardFavoriteRequest(BaseModel):
@@ -110,12 +118,13 @@ class FlashcardImportResponse(BaseModel):
     imported: int
 
 
-# ── Quiz ──────────────────────────────────────────────────────────────────────
+# â”€â”€ Quiz â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class QuizGenerateRequest(BaseModel):
     topic: str
+    topics: list[str] | None = None
     n: int = 5
-    difficulty: str = "Médio"  # "Fácil" | "Médio" | "Difícil"
+    difficulty: Literal["FÃ¡cil", "MÃ©dio", "DifÃ­cil"] = "MÃ©dio"
 
 
 class QuizQuestion(BaseModel):
@@ -130,13 +139,21 @@ class QuizGenerateResponse(BaseModel):
     questoes: list[QuizQuestion]
 
 
+class QuizSavedToggleRequest(BaseModel):
+    question: QuizQuestion
+
+
+class QuizSavedToggleResponse(BaseModel):
+    saved: bool
+
+
 class QuizResultRequest(BaseModel):
     topic: str
     score: int
     total: int
 
 
-# ── Progress ──────────────────────────────────────────────────────────────────
+# â”€â”€ Progress â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class QuizAttempt(BaseModel):
     date: str
@@ -169,7 +186,7 @@ class ProgressResponse(BaseModel):
     file_stats: dict[str, Any]  # total_files, total_pages, total_chunks
 
 
-# ── Daily Digest ──────────────────────────────────────────────────────────────
+# â”€â”€ Daily Digest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class DigestQuestionOfDay(BaseModel):
     frente: str
@@ -185,3 +202,4 @@ class DigestResponse(BaseModel):
     weak_topic: str | None
     weak_topic_subject: str | None
     question_of_day: DigestQuestionOfDay | None
+

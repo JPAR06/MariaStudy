@@ -1,5 +1,6 @@
 """PDF and text file processing: extract text, tables, images → chunks."""
 import base64
+import logging
 import time
 from pathlib import Path
 from typing import Callable
@@ -8,6 +9,8 @@ import pdfplumber
 import fitz  # PyMuPDF
 
 from src.config import CHUNK_SIZE, CHUNK_OVERLAP
+
+logger = logging.getLogger(__name__)
 
 
 def extract_file(
@@ -46,7 +49,8 @@ def _extract_pdf(
 
             for i, plumber_page in enumerate(pdf.pages):
                 if progress_cb:
-                    progress_cb(i / n, f"Pág. {i+1}/{n}")
+                    pct = round((i / max(n, 1)) * 45, 1)
+                    progress_cb(f"Pág. {i+1}/{n}", pct)
 
                 page_text = _process_page(
                     plumber_page, fitz_doc[i], caption_fn
@@ -57,8 +61,8 @@ def _extract_pdf(
                     )
 
             fitz_doc.close()
-    except Exception as e:
-        pass
+    except Exception:
+        logger.exception("PDF extraction failed for %s", filename)
     return chunks
 
 

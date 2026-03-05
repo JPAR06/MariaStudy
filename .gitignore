@@ -20,6 +20,9 @@ data/chroma_db/
 data/subjects.json
 data/progress.json
 data/srs.json
+data/users.json
+data/digest.json
+data/*.backup*.json
 
 # Logs
 *.log

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "hybrid_top6_dist075",
+    "retrieval_mode": "hybrid",
+    "top_k": 6,
+    "max_distance": 0.75,
+    "use_hyde": true,
+    "file_type": "notes"
+  },
+  {
+    "name": "vector_top8_dist080",
+    "retrieval_mode": "vector",
+    "top_k": 8,
+    "max_distance": 0.8,
+    "use_hyde": true,
+    "file_type": "notes"
+  },
+  {
+    "name": "hybrid_top6_nohyde",
+    "retrieval_mode": "hybrid",
+    "top_k": 6,
+    "max_distance": 0.75,
+    "use_hyde": false,
+    "file_type": "notes"
+  }
+]

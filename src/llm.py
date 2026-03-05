@@ -2,9 +2,11 @@
 import os
 import json
 import time
-import streamlit as st
 from groq import Groq
-from src.config import LLM_REASONING, LLM_QUALITY, LLM_FAST, LLM_VISION
+from src.config import LLM_REASONING, LLM_QUALITY, LLM_FAST, LLM_VISION, LLM_WHISPER
+
+class LLMConfigurationError(RuntimeError):
+    """Raised when required LLM settings are missing."""
 
 _SYSTEM = (
     "Responde SEMPRE em português de Portugal (PT-PT). NUNCA uses português do Brasil (PT-BR). "
@@ -19,14 +21,19 @@ _SYSTEM = (
     "Sê preciso, cita as fontes e usa terminologia médica correcta."
 )
 
+_groq_client: Groq | None = None
 
-@st.cache_resource(show_spinner=False)
+
 def _client() -> Groq:
-    key = os.environ.get("GROQ_API_KEY", "")
-    if not key:
-        st.error("GROQ_API_KEY não definida no ficheiro .env")
-        st.stop()
-    return Groq(api_key=key)
+    global _groq_client
+    if _groq_client is None:
+        key = os.environ.get("GROQ_API_KEY", "").strip()
+        if not key:
+            raise LLMConfigurationError(
+                "GROQ_API_KEY is missing or empty. Set it in your environment/.env file."
+            )
+        _groq_client = Groq(api_key=key)
+    return _groq_client
 
 
 def _chat(model: str, messages: list, json_mode: bool = False, max_tokens: int = 2048) -> str:
@@ -241,8 +248,53 @@ def generate_summary(sample_text: str, topics: list[str] | None = None) -> str:
     ]
     try:
         return _chat(LLM_QUALITY, messages, max_tokens=1200)
-    except Exception as e:
+    except Exception:
         return ""  # Caller will skip saving on empty string
+
+
+# ── Per-topic summary ─────────────────────────────────────────────────────────
+
+def generate_topic_summary(topic: str, text: str) -> str:
+    """Generate a focused summary for a single topic using the fast model."""
+    messages = [
+        {"role": "system", "content": _SYSTEM},
+        {"role": "user", "content": (
+            f"Cria um resumo conciso e estruturado sobre o tópico «{topic}» "
+            f"com base no texto médico abaixo, em português de Portugal.\n\n"
+            f"Segue EXACTAMENTE este formato (três secções, nada mais):\n\n"
+            f"**Introdução:**\n"
+            f"2-3 frases a contextualizar o tópico dentro da medicina.\n\n"
+            f"**Pontos-chave:**\n"
+            f"5-8 bullet points com os conceitos mais importantes sobre {topic}. "
+            f"Cada bullet deve transmitir um conceito útil, não apenas um nome.\n\n"
+            f"**Pérolas Clínicas:**\n"
+            f"3-5 factos práticos, valores específicos ou regras clínicas a memorizar "
+            f"(ex: critérios, doses, sinais patognomónicos).\n\n"
+            f"TEXTO:\n{text[:6000]}"
+        )},
+    ]
+    try:
+        return _chat(LLM_FAST, messages, max_tokens=700)
+    except Exception:
+        return ""
+
+
+# ── Audio transcription (Whisper) ────────────────────────────────────────────
+
+def transcribe_audio(file_path: str) -> str:
+    """
+    Transcribe an audio or video file using Groq Whisper.
+    Supported formats: mp3, m4a, wav, webm, mp4, ogg, flac (max 25 MB on Groq free tier).
+    Returns the full transcript as plain text, or raises on failure.
+    """
+    with open(file_path, "rb") as f:
+        result = _client().audio.transcriptions.create(
+            model=LLM_WHISPER,
+            file=f,
+            response_format="text",
+            language="pt",
+        )
+    return result if isinstance(result, str) else result.text
 
 
 # ── Image captioning (vision) ─────────────────────────────────────────────────

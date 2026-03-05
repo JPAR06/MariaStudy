@@ -1,7 +1,9 @@
-from pathlib import Path
+﻿from pathlib import Path
+from dotenv import load_dotenv
 
 # --- Paths ---
 BASE_DIR = Path(__file__).parent.parent
+load_dotenv(BASE_DIR / ".env")
 DATA_DIR = BASE_DIR / "data"
 UPLOADS_DIR = DATA_DIR / "uploads"
 CHROMA_DIR = DATA_DIR / "chroma_db"
@@ -19,8 +21,9 @@ LLM_REASONING = "llama-3.3-70b-versatile"          # Q&A
 LLM_QUALITY = "llama-3.3-70b-versatile"            # Flashcards, quiz
 LLM_FAST = "llama-3.1-8b-instant"                  # Topics, summaries
 LLM_VISION = "llama-3.2-11b-vision-preview"        # Image captions
+LLM_WHISPER = "whisper-large-v3-turbo"             # Audio/video transcription
 
 # --- RAG ---
-CHUNK_SIZE = 300   # words per chunk (≈ 400 tokens, safe for embedding model)
-CHUNK_OVERLAP = 30  # words overlap between chunks
+CHUNK_SIZE = 400    # words per chunk (approx 530 tokens)
+CHUNK_OVERLAP = 50  # words overlap between chunks
 TOP_K = 6           # chunks to retrieve for RAG

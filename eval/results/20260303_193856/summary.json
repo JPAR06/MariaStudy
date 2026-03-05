@@ -1,0 +1,41 @@
+{
+  "hybrid_top6_dist075": {
+    "n": 2,
+    "retrieve_ms_avg": 253.075,
+    "answer_ms_avg": null,
+    "hit_at_k_avg": null,
+    "mrr_like_avg": null,
+    "keyword_coverage_avg": 0.0,
+    "citation_index_valid_ratio_avg": null,
+    "judge_correctness_avg": null,
+    "judge_faithfulness_avg": null,
+    "judge_completeness_avg": null,
+    "errors": 0
+  },
+  "vector_top8_dist080": {
+    "n": 2,
+    "retrieve_ms_avg": 45.575,
+    "answer_ms_avg": null,
+    "hit_at_k_avg": null,
+    "mrr_like_avg": null,
+    "keyword_coverage_avg": 0.0,
+    "citation_index_valid_ratio_avg": null,
+    "judge_correctness_avg": null,
+    "judge_faithfulness_avg": null,
+    "judge_completeness_avg": null,
+    "errors": 0
+  },
+  "hybrid_top6_nohyde": {
+    "n": 2,
+    "retrieve_ms_avg": 52.935,
+    "answer_ms_avg": null,
+    "hit_at_k_avg": null,
+    "mrr_like_avg": null,
+    "keyword_coverage_avg": 0.0,
+    "citation_index_valid_ratio_avg": null,
+    "judge_correctness_avg": null,
+    "judge_faithfulness_avg": null,
+    "judge_completeness_avg": null,
+    "errors": 0
+  }
+}

@@ -1,4 +1,5 @@
 """RAG pipeline: ingest files and answer questions with citations."""
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable
 
@@ -37,16 +38,46 @@ def ingest_file(
     if not chunks:
         return 0
 
-    # Embed
+    total_chunks = len(chunks)
     texts = [c["text"] for c in chunks]
-    embeddings = embedder.embed(texts)
 
-    # Store in ChromaDB
-    vectorstore.add_chunks(subject_id, chunks, embeddings)
+    # Embed in batches so progress is tied to real work
+    embeddings: list[list[float]] = []
+    embed_batch = 32
+    if progress_cb:
+        progress_cb(f"A calcular embeddings… 0/{total_chunks} chunks", 46)
+    for i in range(0, total_chunks, embed_batch):
+        end = min(i + embed_batch, total_chunks)
+        embeddings.extend(embedder.embed(texts[i:end]))
+        if progress_cb:
+            pct = round(46 + (end / max(total_chunks, 1)) * 32, 1)  # 46 -> 78
+            progress_cb(f"A calcular embeddings… {end}/{total_chunks} chunks", pct)
+
+    # Store in ChromaDB with real batch progress
+    if progress_cb:
+        progress_cb(f"A indexar vetores… 0/{total_chunks} chunks", 79)
+    vectorstore.add_chunks(
+        subject_id,
+        chunks,
+        embeddings,
+        progress_cb=(
+            (lambda done, total: progress_cb(
+                f"A indexar vetores… {done}/{total} chunks",
+                round(79 + (done / max(total, 1)) * 19, 1),  # 79 -> 98
+            ))
+            if progress_cb
+            else None
+        ),
+    )
 
     # Page count
     n_pages = max((c["metadata"]["page"] for c in chunks), default=1)
     subject_store.add_file_to_subject(subject_id, filename, n_pages, file_type)
+
+    if progress_cb:
+        progress_cb("A extrair tópicos…", 99)
+
+    _refresh_topics_and_summary(subject_id)
 
     return len(chunks)
 
@@ -97,13 +128,31 @@ def ask(subject_id: str, question: str, topic_filter: str | None = None) -> dict
 def get_topic_chunks(subject_id: str, topic: str, top_k: int = 8) -> list[dict]:
     """
     Retrieve chunks relevant to a topic for flashcards/quiz.
-    Blends notes (explanations) + exercises (real exam questions) for richer quiz generation.
+    Tries pre-computed primary_topic filter first (precise + fast).
+    Falls back to full hybrid search if filtered results are sparse.
+    Blends notes (explanations) + exercises (real exam questions) for richer output.
     """
     emb = embedder.embed([topic])[0]
-    # Get notes chunks (primary source of content)
-    notes = vectorstore.hybrid_query(subject_id, topic, emb, top_k, file_type="notes")
-    # Get exercise chunks (real questions to inspire quiz style), fewer needed
-    exercises = vectorstore.hybrid_query(subject_id, topic, emb, min(4, top_k // 2), file_type="exercises")
+
+    # Try pre-computed topic filter — only available after _assign_chunk_topics() runs
+    notes_filtered = vectorstore.hybrid_query(
+        subject_id, topic, emb, top_k, file_type="notes", topic_filter=topic
+    )
+    exercises_filtered = vectorstore.hybrid_query(
+        subject_id, topic, emb, min(4, top_k // 2), file_type="exercises", topic_filter=topic
+    )
+
+    # If filtered results are rich enough, use them
+    if len(notes_filtered) >= top_k // 2:
+        notes = notes_filtered
+        exercises = exercises_filtered
+    else:
+        # Fall back to full unfiltered hybrid search
+        notes = vectorstore.hybrid_query(subject_id, topic, emb, top_k, file_type="notes")
+        exercises = vectorstore.hybrid_query(
+            subject_id, topic, emb, min(4, top_k // 2), file_type="exercises"
+        )
+
     # Merge: notes first, then exercises (deduplicated by text)
     seen = set()
     result = []
@@ -111,21 +160,25 @@ def get_topic_chunks(subject_id: str, topic: str, top_k: int = 8) -> list[dict]:
         if c["text"] not in seen:
             seen.add(c["text"])
             result.append(c)
+
     # Fall back to unfiltered if we got nothing (old data without file_type metadata)
     if not result:
         result = vectorstore.hybrid_query(subject_id, topic, emb, top_k)
+
     return result
 
 
 def _refresh_topics_and_summary(subject_id: str):
     """
-    Extract topics (TOC-first, LLM fallback) and generate a summary.
+    Extract topics (TOC-first, LLM fallback), assign topics to chunks, generate summary.
 
     Topic extraction strategy:
     1. Read the PDF bookmark outline (fitz.get_toc) from every uploaded PDF.
        This is instant, free, and gives exact chapter/section titles.
     2. Only if no file yields a usable outline (< 5 topics across all files),
        fall back to LLM extraction from early-page text.
+    3. After topics are finalised, pre-compute primary_topic for every chunk
+       using cosine similarity (stored embeddings — no re-embedding needed).
     """
     import time
 
@@ -139,10 +192,13 @@ def _refresh_topics_and_summary(subject_id: str):
 
     # ── Step 1: TOC extraction from PDF bookmarks ──────────────────────────
     toc_topics: list[str] = []
+    per_file_topics: dict[str, list[str]] = {}  # filename → file-level topics from its TOC
     for file_info in subject.get("files", []):
         file_path = str(UPLOADS_DIR / subject_id / file_info["name"])
         if file_info["name"].lower().endswith(".pdf"):
             topics_from_file = processor.extract_toc(file_path)
+            if topics_from_file:
+                per_file_topics[file_info["name"]] = topics_from_file
             for t in topics_from_file:
                 if t not in toc_topics:
                     toc_topics.append(t)
@@ -171,10 +227,22 @@ def _refresh_topics_and_summary(subject_id: str):
     if extracted_topics:
         subject_store.update_topics(subject_id, extracted_topics)
 
+    # Store per-file topics (from TOC) so the UI can show two-tier topic navigation
+    for fname, ftopics in per_file_topics.items():
+        subject_store.set_file_topics(subject_id, fname, ftopics)
+
+    # ── Step 3: Pre-compute primary_topic per chunk ────────────────────────
+    # Uses stored embeddings (no re-embedding cost). Enables fast metadata-filtered retrieval.
+    if extracted_topics:
+        try:
+            vectorstore.assign_topics_to_chunks(subject_id, extracted_topics)
+        except Exception:
+            pass  # Non-fatal — retrieval falls back to full hybrid search
+
     # Pause to avoid back-to-back Groq rate limit on the same model
     time.sleep(2)
 
-    # ── Summary ────────────────────────────────────────────────────────────
+    # ── Subject-level summary ──────────────────────────────────────────────
     summary_sample = " ".join(c["text"] for c in spread_chunks)
     all_topics = extracted_topics or subject_store.get_subject(subject_id).get("topics", [])
     try:
@@ -184,23 +252,50 @@ def _refresh_topics_and_summary(subject_id: str):
     except Exception:
         pass
 
+    # ── Per-topic summaries ────────────────────────────────────────────────
+    for topic in extracted_topics:
+        try:
+            topic_chunks = get_topic_chunks(subject_id, topic, top_k=8)
+            if topic_chunks:
+                topic_text = " ".join(c["text"] for c in topic_chunks)
+                topic_summary = llm.generate_topic_summary(topic, topic_text)
+                if topic_summary:
+                    subject_store.update_topic_summary(subject_id, topic, topic_summary)
+            time.sleep(1)  # avoid consecutive Groq rate-limit hits
+        except Exception:
+            pass
+
 
 def search_all_subjects(question: str, subjects: list[dict], top_k: int = 3) -> list[dict]:
     """
-    Search across all subject collections.
+    Search across all subject collections in parallel.
     Returns subjects sorted by relevance, each with their best matching chunks.
     """
+    if not subjects:
+        return []
+
     q_emb = embedder.embed([question])[0]
-    results = []
-    for s in subjects:
+
+    def _search_one(s: dict):
         chunks = vectorstore.query(s["id"], q_emb, top_k=top_k)
-        if chunks:
-            results.append({
-                "subject_id": s["id"],
-                "subject_name": s["name"],
-                "chunks": chunks,
-                "best_distance": min(c["distance"] for c in chunks),
-            })
+        if not chunks:
+            return None
+        return {
+            "subject_id": s["id"],
+            "subject_name": s["name"],
+            "chunks": chunks,
+            "best_distance": min(c["distance"] for c in chunks),
+        }
+
+    results = []
+    max_workers = min(4, len(subjects))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(_search_one, s) for s in subjects]
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                results.append(result)
+
     results.sort(key=lambda x: x["best_distance"])  # lower cosine distance = more relevant
     return results
 

@@ -1,9 +1,31 @@
 /** Typed API client — all calls go through Next.js /api rewrite → FastAPI */
+import { getToken } from "@/lib/auth"
 
 const BASE = ""  // empty = uses Next.js rewrites → /api/*
 
+function handleAuthFailure(res: Response): never {
+  if (typeof window !== "undefined" && res.status === 401) {
+    localStorage.removeItem("auth_token")
+    localStorage.removeItem("display_name")
+    document.cookie = "auth_token=; path=/; max-age=0"
+    window.location.href = "/login"
+  }
+  throw new Error(`Auth error: ${res.status}`)
+}
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const token = getToken()
+  return token
+    ? { Authorization: `Bearer ${token}`, ...extra }
+    : { ...extra }
+}
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store" })
+  const res = await fetch(`${BASE}${path}`, {
+    cache: "no-store",
+    headers: authHeaders(),
+  })
+  if (res.status === 401) handleAuthFailure(res)
   if (!res.ok) throw new Error(`GET ${path}: ${res.status} ${await res.text()}`)
   return res.json()
 }
@@ -11,24 +33,30 @@ async function get<T>(path: string): Promise<T> {
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401) handleAuthFailure(res)
   if (!res.ok) throw new Error(`POST ${path}: ${res.status} ${await res.text()}`)
   return res.json()
 }
 
 async function del(path: string): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, { method: "DELETE" })
+  const res = await fetch(`${BASE}${path}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  })
+  if (res.status === 401) handleAuthFailure(res)
   if (!res.ok && res.status !== 204) throw new Error(`DELETE ${path}: ${res.status}`)
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   })
+  if (res.status === 401) handleAuthFailure(res)
   if (!res.ok) throw new Error(`PUT ${path}: ${res.status} ${await res.text()}`)
   return res.json()
 }
@@ -42,12 +70,15 @@ export interface Subject {
   files: FileRecord[]
   topics: string[]
   summary: string
+  topic_summaries: Record<string, string>
+  status: "active" | "finished"
 }
 
 export interface FileRecord {
   name: string
   pages: number
   type: "notes" | "exercises"
+  topics: string[]
 }
 
 export interface Source {
@@ -139,9 +170,15 @@ export const api = {
     get: (id: string) => get<Subject>(`/api/subjects/${id}`),
     create: (name: string) => post<Subject>("/api/subjects", { name }),
     delete: (id: string) => del(`/api/subjects/${id}`),
-    updateTopics: (id: string, topics: string[]) => put("/api/subjects/${id}/topics", topics),
+    updateTopics: (id: string, topics: string[]) => put(`/api/subjects/${id}/topics`, topics),
+    updateStatus: (id: string, status: "active" | "finished") =>
+      put<Subject>(`/api/subjects/${id}/status`, { status }),
     deleteTopic: (id: string, topic: string) =>
       del(`/api/subjects/${id}/topics/${encodeURIComponent(topic)}`),
+    refreshSummaries: (id: string) =>
+      post(`/api/subjects/${id}/refresh-summaries`, {}),
+    sourceText: (id: string, file: string, page: number) =>
+      get<{ texts: string[] }>(`/api/subjects/${id}/source-text?file=${encodeURIComponent(file)}&page=${page}`),
   },
 
   // Files
@@ -165,8 +202,6 @@ export const api = {
 
   // Flashcards
   flashcards: {
-    generate: (subjectId: string, topic: string, n: number) =>
-      post<{ flashcards: FlashcardBase[] }>(`/api/subjects/${subjectId}/flashcards/generate`, { topic, n }),
     getDeck: (subjectId: string) =>
       get<FlashcardInDB[]>(`/api/subjects/${subjectId}/flashcards`),
     getDue: (subjectId: string) =>
@@ -179,18 +214,20 @@ export const api = {
       post<{ favorite: boolean }>(`/api/subjects/${subjectId}/flashcards/favorite`, { card }),
     delete: (subjectId: string, frente: string) =>
       del(`/api/subjects/${subjectId}/flashcards/${encodeURIComponent(frente)}`),
+    clearAll: (subjectId: string) =>
+      del(`/api/subjects/${subjectId}/flashcards/all`),
     import: (subjectId: string, text: string) =>
       post<{ imported: number }>(`/api/subjects/${subjectId}/flashcards/import`, { text }),
   },
 
   // Quiz
   quiz: {
-    generate: (subjectId: string, topic: string, n: number, difficulty: string) =>
-      post<{ questoes: QuizQuestion[] }>(`/api/subjects/${subjectId}/quiz/generate`, {
-        topic, n, difficulty,
-      }),
     saveResult: (subjectId: string, topic: string, score: number, total: number) =>
       post(`/api/subjects/${subjectId}/quiz/result`, { topic, score, total }),
+    getSaved: (subjectId: string) =>
+      get<QuizQuestion[]>(`/api/subjects/${subjectId}/quiz/saved`),
+    toggleSaved: (subjectId: string, question: QuizQuestion) =>
+      post<{ saved: boolean }>(`/api/subjects/${subjectId}/quiz/saved`, { question }),
   },
 
   // Progress
@@ -201,5 +238,14 @@ export const api = {
   // Daily Digest
   digest: {
     get: () => get<DigestResponse>("/api/digest"),
+  },
+
+  // Auth
+  auth: {
+    login: (username: string, password: string) =>
+      post<{ token: string; username: string; display_name: string }>(
+        "/api/auth/login",
+        { username, password },
+      ),
   },
 }

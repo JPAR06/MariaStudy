@@ -1,7 +1,10 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 from api.schemas import AskRequest, AskResponse, SearchRequest, SearchResult, Source
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/subjects/{subject_id}/ask", response_model=AskResponse)
@@ -10,8 +13,10 @@ def ask(subject_id: str, body: AskRequest):
     from src.rag import ask as _ask
     if not get_subject(subject_id):
         raise HTTPException(404, "Subject not found")
+    logger.info("Q&A: subject=%s topic=%s question=%r", subject_id, body.topic_filter, body.question[:80])
     result = _ask(subject_id, body.question, topic_filter=body.topic_filter)
     sources = [Source(file=s["file"], page=s["page"]) for s in result.get("sources", [])]
+    logger.info("Q&A answered: subject=%s sources=%d", subject_id, len(sources))
     return AskResponse(answer=result["answer"], sources=sources)
 
 

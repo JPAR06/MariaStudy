@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from api.schemas import FileTypeUpdate
 from src.config import UPLOADS_DIR
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=2)
 
 
@@ -26,7 +28,15 @@ async def upload_file(
         raise HTTPException(404, "Subject not found")
 
     file_bytes = await file.read()
-    filename = file.filename or "upload.pdf"
+    if len(file_bytes) > 200 * 1024 * 1024:  # 200 MB hard cap
+        raise HTTPException(413, "Ficheiro demasiado grande (máx 200 MB)")
+
+    # Strip path components to prevent directory traversal
+    from pathlib import PurePosixPath
+    raw_name = file.filename or "upload.pdf"
+    filename = PurePosixPath(raw_name).name or "upload.pdf"
+
+    logger.info("Upload started: subject=%s file=%s size=%d type=%s", subject_id, filename, len(file_bytes), file_type)
 
     # Shared queue for progress callbacks → SSE
     loop = asyncio.get_event_loop()
@@ -62,6 +72,7 @@ async def upload_file(
                     chunks_created = future.result()
                     break
 
+        logger.info("Upload done: subject=%s file=%s chunks=%d", subject_id, filename, chunks_created)
         yield f"data: {json.dumps({'done': True, 'chunks': chunks_created, 'filename': filename})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
@@ -69,8 +80,13 @@ async def upload_file(
 
 @router.delete("/subjects/{subject_id}/files/{filename}", status_code=204)
 def delete_file(subject_id: str, filename: str):
-    from src.rag import delete_file as _delete
-    _delete(subject_id, filename)
+    try:
+        from src.rag import delete_file as _delete
+        _delete(subject_id, filename)
+        logger.info("Deleted file: subject=%s file=%s", subject_id, filename)
+    except Exception as e:
+        logger.error("Delete file failed: subject=%s file=%s error=%s", subject_id, filename, e)
+        raise HTTPException(500, detail=str(e))
 
 
 @router.put("/subjects/{subject_id}/files/{filename}/type")
@@ -80,11 +96,3 @@ def update_file_type(subject_id: str, filename: str, body: FileTypeUpdate):
     return {"ok": True}
 
 
-@router.get("/files/{subject_id}/{filename}")
-def serve_file(subject_id: str, filename: str):
-    """Serve raw uploaded file (used by PDF viewer)."""
-    path = Path(UPLOADS_DIR) / subject_id / filename
-    if not path.exists():
-        raise HTTPException(404, "File not found")
-    media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
-    return FileResponse(str(path), media_type=media_type, filename=filename)
