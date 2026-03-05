@@ -307,13 +307,6 @@ def get_favorite_cards(subject_id: str) -> list[dict]:
     ]
 
 
-def is_favorite(subject_id: str, frente: str) -> bool:
-    with _srs_lock:
-        data = _load(SRS_FILE).get(subject_id, {})
-    cid = _card_id(frente)
-    return data.get(cid, {}).get("favorite", False)
-
-
 def get_srs_stats(subject_id: str) -> dict:
     with _srs_lock:
         data = _load(SRS_FILE).get(subject_id, {})
@@ -326,20 +319,6 @@ def get_srs_stats(subject_id: str) -> dict:
         "total": len(data), "due": due, "mastered": mastered,
         "learning": len(data) - mastered - new, "new": new, "favorites": favorites,
     }
-
-
-def sort_cards_by_due(subject_id: str, cards: list) -> list:
-    with _srs_lock:
-        data = _load(SRS_FILE).get(subject_id, {})
-    today = date.today().isoformat()
-
-    def _priority(card):
-        cid = _card_id(card.get("frente", ""))
-        info = data.get(cid, {})
-        next_rev = info.get("next_review", "0000")
-        return (0 if next_rev <= today else 1, next_rev)
-
-    return sorted(cards, key=_priority)
 
 
 # ── Anki Export ──────────────────────────────────────────────────────────────

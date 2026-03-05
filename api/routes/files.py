@@ -2,10 +2,9 @@ import asyncio
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, Form
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from api.schemas import FileTypeUpdate
 from src.config import UPLOADS_DIR
@@ -94,5 +93,3 @@ def update_file_type(subject_id: str, filename: str, body: FileTypeUpdate):
     from src.subjects import set_file_type
     set_file_type(subject_id, filename, body.file_type)
     return {"ok": True}
-
-

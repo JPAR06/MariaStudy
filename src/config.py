@@ -21,7 +21,6 @@ LLM_REASONING = "llama-3.3-70b-versatile"          # Q&A
 LLM_QUALITY = "llama-3.3-70b-versatile"            # Flashcards, quiz
 LLM_FAST = "llama-3.1-8b-instant"                  # Topics, summaries
 LLM_VISION = "llama-3.2-11b-vision-preview"        # Image captions
-LLM_WHISPER = "whisper-large-v3-turbo"             # Audio/video transcription
 
 # --- RAG ---
 CHUNK_SIZE = 400    # words per chunk (approx 530 tokens)

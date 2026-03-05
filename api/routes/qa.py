@@ -20,12 +20,6 @@ def ask(subject_id: str, body: AskRequest):
     return AskResponse(answer=result["answer"], sources=sources)
 
 
-@router.post("/subjects/{subject_id}/suggest-followups")
-def suggest_followups(subject_id: str, question: str, answer: str):
-    from src.llm import suggest_followups as _sf
-    return {"followups": _sf(question, answer)}
-
-
 @router.post("/search", response_model=list[SearchResult])
 def search_all(body: SearchRequest):
     from src.subjects import list_subjects

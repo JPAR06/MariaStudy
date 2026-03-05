@@ -167,6 +167,7 @@ def delete_card(subject_id: str, card_id: str):
 def import_cards(subject_id: str, body: FlashcardImportRequest):
     from src.progress import import_cards as _import
     from src.progress import parse_import_text
+    from src.subjects import get_subject
 
     if not get_subject(subject_id):
         raise HTTPException(404, "Subject not found")
@@ -179,9 +180,9 @@ def import_cards(subject_id: str, body: FlashcardImportRequest):
 def export_anki(subject_id: str):
     """Export the full deck as an Anki .apkg file (download)."""
     from src.progress import build_anki_package
-    from src.subjects import get_subject as _get
+    from src.subjects import get_subject
 
-    subject = _get(subject_id)
+    subject = get_subject(subject_id)
     if not subject:
         raise HTTPException(404, "Subject not found")
     try:
@@ -196,9 +197,3 @@ def export_anki(subject_id: str):
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{safe}.apkg"'},
     )
-
-
-def get_subject(subject_id: str):
-    from src.subjects import get_subject as _get
-
-    return _get(subject_id)

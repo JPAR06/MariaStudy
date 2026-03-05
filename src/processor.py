@@ -246,10 +246,3 @@ def extract_toc(file_path: str) -> list[str]:
 
     return result
 
-
-def count_pages(file_path: str) -> int:
-    try:
-        with pdfplumber.open(file_path) as pdf:
-            return len(pdf.pages)
-    except Exception:
-        return 0

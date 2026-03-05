@@ -3,7 +3,7 @@ import os
 import json
 import time
 from groq import Groq
-from src.config import LLM_REASONING, LLM_QUALITY, LLM_FAST, LLM_VISION, LLM_WHISPER
+from src.config import LLM_REASONING, LLM_QUALITY, LLM_FAST, LLM_VISION
 
 class LLMConfigurationError(RuntimeError):
     """Raised when required LLM settings are missing."""
@@ -153,26 +153,6 @@ def generate_quiz(chunks: list[dict], topic: str, n: int, difficulty: str) -> li
         return []
 
 
-# ── Follow-up question suggestions ───────────────────────────────────────────
-
-def suggest_followups(question: str, answer: str) -> list[str]:
-    messages = [
-        {"role": "system", "content": _SYSTEM},
-        {"role": "user", "content": (
-            f"Com base nesta pergunta e resposta médica, sugere exactamente 3 perguntas de "
-            f"follow-up que um estudante de medicina poderia querer aprofundar.\n"
-            f"Formato JSON: {{\"perguntas\": [\"pergunta 1\", \"pergunta 2\", \"pergunta 3\"]}}\n\n"
-            f"PERGUNTA: {question}\n"
-            f"RESPOSTA (resumo): {answer[:600]}"
-        )},
-    ]
-    raw = _chat(LLM_FAST, messages, json_mode=True, max_tokens=300)
-    try:
-        return json.loads(raw).get("perguntas", [])
-    except Exception:
-        return []
-
-
 # ── HyDE — Hypothetical Document Embedding ────────────────────────────────────
 
 def hypothetical_answer(question: str, topic: str | None = None) -> str:
@@ -277,24 +257,6 @@ def generate_topic_summary(topic: str, text: str) -> str:
         return _chat(LLM_FAST, messages, max_tokens=700)
     except Exception:
         return ""
-
-
-# ── Audio transcription (Whisper) ────────────────────────────────────────────
-
-def transcribe_audio(file_path: str) -> str:
-    """
-    Transcribe an audio or video file using Groq Whisper.
-    Supported formats: mp3, m4a, wav, webm, mp4, ogg, flac (max 25 MB on Groq free tier).
-    Returns the full transcript as plain text, or raises on failure.
-    """
-    with open(file_path, "rb") as f:
-        result = _client().audio.transcriptions.create(
-            model=LLM_WHISPER,
-            file=f,
-            response_format="text",
-            language="pt",
-        )
-    return result if isinstance(result, str) else result.text
 
 
 # ── Image captioning (vision) ─────────────────────────────────────────────────
