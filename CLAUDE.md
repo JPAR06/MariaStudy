@@ -209,6 +209,58 @@ npm run dev   # runs on localhost:3000
 
 ---
 
+## Git Workflow (Live Production)
+
+The app runs 24/7 on Linux Mint via Docker. `main` = production. Follow this workflow:
+
+### Branch strategy
+- `main` — production branch, always deployable. **Never commit directly to main for features.**
+- `dev` or `fix/description` — all development and fixes branch off main
+
+### Standard workflow
+```bash
+# Start a new feature or fix
+git checkout -b fix/quiz-encoding   # or feat/new-feature
+
+# Work, commit often with clear messages
+git add <specific files>
+git commit -m "fix: description of what and why"
+
+# When ready — merge to main and deploy
+git checkout main
+git merge fix/quiz-encoding
+git push
+
+# On Linux Mint — pull and restart
+git pull && docker compose up -d
+```
+
+### Commit message convention
+- `feat:` — new feature
+- `fix:` — bug fix
+- `chore:` — maintenance (deps, config, docker)
+- `refactor:` — code change with no behaviour change
+- `docs:` — documentation only
+
+### Deploying to production (Linux Mint)
+```bash
+# SSH in via Tailscale
+ssh user@100.115.182.22
+
+# Pull latest and restart containers (no rebuild unless Dockerfile changed)
+cd MariaStudy && git pull && docker compose up -d
+
+# If requirements.txt or package.json changed (needs rebuild):
+docker compose up -d --build
+```
+
+### Before merging to main
+- Run `python -m compileall src api` — no syntax errors
+- Run `npm run build` in `frontend/` — no TypeScript errors
+- Test the affected feature locally
+
+---
+
 ## Codex
 
 ### Backend changes implemented

@@ -255,7 +255,7 @@ export default function SubjectDashboardPage({ params }: { params: { subjectId: 
       selectedTopics.length > 0
         ? selectedTopics.join(", ")
         : topic === "Toda a UC"
-          ? subject!.name
+          ? "Toda a UC"
           : topic
     const today = new Date().toISOString().split("T")[0]
     let localDeck: FlashcardInDB[] = []
@@ -370,7 +370,7 @@ export default function SubjectDashboardPage({ params }: { params: { subjectId: 
       selectedTopics.length > 0
         ? selectedTopics.join(", ")
         : topic === "Toda a UC"
-          ? subject!.name
+          ? "Toda a UC"
           : topic
     // Buffer until MIN_TO_START questions arrive before switching to quiz view
     const MIN_TO_START = Math.min(5, quizN)

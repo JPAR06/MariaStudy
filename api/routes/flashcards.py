@@ -61,7 +61,8 @@ async def generate_flashcards(subject_id: str, body: FlashcardGenerateRequest):
                     seen_texts.add(text)
                     chunks.append(chunk)
         else:
-            chunks = get_topic_chunks(subject_id, body.topic, top_k=8)
+            query = body.topic if body.topic and body.topic != "Toda a UC" else "medicina clínica"
+            chunks = get_topic_chunks(subject_id, query, top_k=8)
     except Exception as exc:
         raise HTTPException(422, f"Erro ao pesquisar conteudo: {exc}") from exc
 

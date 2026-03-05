@@ -62,7 +62,8 @@ async def generate_quiz(subject_id: str, body: QuizGenerateRequest):
                     seen_texts.add(text)
                     chunks.append(chunk)
         else:
-            chunks = get_topic_chunks(subject_id, body.topic, top_k=10)
+            query = body.topic if body.topic and body.topic != "Toda a UC" else "medicina clínica"
+            chunks = get_topic_chunks(subject_id, query, top_k=10)
     except Exception as exc:
         raise HTTPException(422, f"Erro ao pesquisar conteudo: {exc}") from exc
 
@@ -73,30 +74,29 @@ async def generate_quiz(subject_id: str, body: QuizGenerateRequest):
 
     async def event_stream():
         emitted = 0
-        for _ in range(body.n):
-            try:
-                qs = await loop.run_in_executor(
-                    None, lambda: _gen(chunks, topic_label, 1, body.difficulty)
-                )
-                for q in qs:
-                    try:
-                        validated = QuizQuestion(**q)
-                        payload = {
-                            "pergunta": validated.pergunta,
-                            "opcoes": validated.opcoes,
-                            "correta": validated.correta,
-                            "explicacao": validated.explicacao,
-                            "fonte": validated.fonte,
-                        }
-                        yield f"data: {json.dumps(payload)}\n\n"
-                        emitted += 1
-                    except Exception:
-                        pass  # skip malformed question from LLM
-            except LLMConfigurationError as exc:
-                yield f"data: {json.dumps({'error': str(exc)})}\n\n"
-                return
-            except Exception:
-                pass  # skip this iteration on Groq/network error
+        try:
+            qs = await loop.run_in_executor(
+                None, lambda: _gen(chunks, topic_label, body.n, body.difficulty)
+            )
+            for q in qs:
+                try:
+                    validated = QuizQuestion(**q)
+                    payload = {
+                        "pergunta": validated.pergunta,
+                        "opcoes": validated.opcoes,
+                        "correta": validated.correta,
+                        "explicacao": validated.explicacao,
+                        "fonte": validated.fonte,
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    emitted += 1
+                except Exception:
+                    pass  # skip malformed question from LLM
+        except LLMConfigurationError as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+            return
+        except Exception:
+            pass
 
         logger.info("Quiz generation done: subject=%s topic=%s emitted=%d", subject_id, topic_label, emitted)
         yield f"data: {json.dumps({'done': True, 'total': emitted})}\n\n"

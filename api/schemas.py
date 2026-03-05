@@ -124,7 +124,7 @@ class QuizGenerateRequest(BaseModel):
     topic: str
     topics: list[str] | None = None
     n: int = 5
-    difficulty: Literal["FÃ¡cil", "MÃ©dio", "DifÃ­cil"] = "MÃ©dio"
+    difficulty: Literal["Fácil", "Médio", "Difícil"] = "Médio"
 
 
 class QuizQuestion(BaseModel):
