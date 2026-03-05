@@ -10,7 +10,7 @@ services:
       - ./src:/app/src
       - ./api:/app/api
     env_file: .env
-    restart: unless-stopped
+    restart: always
 
   # ── Next.js frontend ─────────────────────────────────────────────────────────
   web:
@@ -23,7 +23,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://api:8000
     depends_on:
       - api
-    restart: unless-stopped
+    restart: always
 
   # ── Cloudflare Tunnel ─────────────────────────────────────────────────────────
   cloudflared:
@@ -33,4 +33,4 @@ services:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - web
-    restart: unless-stopped
+    restart: always
