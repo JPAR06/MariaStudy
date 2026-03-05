@@ -145,6 +145,7 @@ export interface ProgressData {
   topic_stats: TopicStat[]
   srs_stats: SRSStats
   file_stats: { total_files: number; total_pages: number; total_chunks: number }
+  daily_activity: Record<string, number>
 }
 
 export interface DigestResponse {

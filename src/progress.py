@@ -219,6 +219,25 @@ def save_flashcard_result(subject_id: str, card: dict, result: str):
         data[subject_id] = sid
         _atomic_save(SRS_FILE, data)
 
+    _increment_daily_activity(subject_id)
+
+
+def _increment_daily_activity(subject_id: str):
+    today = date.today().isoformat()
+    with _progress_lock:
+        data = _load(PROGRESS_FILE)
+        entry = _subject_progress_entry(data, subject_id)
+        activity = entry.setdefault("activity", {})
+        activity[today] = activity.get(today, 0) + 1
+        data[subject_id] = entry
+        _atomic_save(PROGRESS_FILE, data)
+
+
+def get_daily_activity(subject_id: str) -> dict:
+    with _progress_lock:
+        data = _load(PROGRESS_FILE)
+        return _subject_progress_entry(data, subject_id).get("activity", {})
+
 
 def toggle_favorite(subject_id: str, card: dict) -> bool:
     with _srs_lock:

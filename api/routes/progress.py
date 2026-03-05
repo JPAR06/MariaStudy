@@ -7,7 +7,7 @@ router = APIRouter()
 @router.get("/subjects/{subject_id}/progress", response_model=ProgressResponse)
 def get_progress(subject_id: str):
     from src.subjects import get_subject
-    from src.progress import get_quiz_history, get_topic_stats, get_srs_stats
+    from src.progress import get_quiz_history, get_topic_stats, get_srs_stats, get_daily_activity
     from src.vectorstore import collection_count
 
     subj = get_subject(subject_id)
@@ -30,4 +30,5 @@ def get_progress(subject_id: str):
             "total_pages": total_pages,
             "total_chunks": total_chunks,
         },
+        daily_activity=get_daily_activity(subject_id),
     )

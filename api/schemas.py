@@ -184,6 +184,7 @@ class ProgressResponse(BaseModel):
     topic_stats: list[TopicStat]
     srs_stats: SRSStats
     file_stats: dict[str, Any]  # total_files, total_pages, total_chunks
+    daily_activity: dict[str, int] = {}  # date → flashcard review count
 
 
 # â”€â”€ Daily Digest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

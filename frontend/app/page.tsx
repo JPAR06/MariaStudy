@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { api, type FlashcardInDB, type ProgressData, type Subject } from "@/lib/api"
+import { api, type ProgressData, type Subject } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { getDisplayName } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -78,13 +78,13 @@ export default function HomePage() {
   const chartSubjects = subjects
     .map((subject, index) => ({ ...subject, index }))
     .filter(({ index }) => {
-      const deck = deckQueries[index]?.data ?? []
+      const activity = progressQueries[index]?.data?.daily_activity ?? {}
       const quizzes = progressQueries[index]?.data?.quiz_history ?? []
-      return deck.some((c) => !!c.last_reviewed) || quizzes.length > 0
+      return Object.keys(activity).length > 0 || quizzes.length > 0
     })
     .slice(0, 8)
 
-  const chartData = buildDailyData(chartSubjects, progressQueries, deckQueries)
+  const chartData = buildDailyData(chartSubjects, progressQueries)
 
   return (
     <div className="flex flex-col h-full">
@@ -303,7 +303,6 @@ const UC_QUIZ_COLORS = [
 function buildDailyData(
   subjects: Array<Subject & { index: number }>,
   progressQueries: Array<{ data?: ProgressData }>,
-  deckQueries: Array<{ data?: FlashcardInDB[] }>,
 ) {
   const days = 14
   const dateList = Array.from({ length: days }, (_, i) => {
@@ -320,8 +319,8 @@ function buildDailyData(
     for (const subject of subjects) {
       const quizHistory = progressQueries[subject.index]?.data?.quiz_history ?? []
       const quizCount = quizHistory.filter((q) => q.date === dateStr).length
-      const deck = deckQueries[subject.index]?.data ?? []
-      const flashCount = deck.filter((c) => c.last_reviewed === dateStr).length
+      const activity = progressQueries[subject.index]?.data?.daily_activity ?? {}
+      const flashCount = activity[dateStr] ?? 0
       row[subject.id + "_flash"] = flashCount
       row[subject.id + "_quiz"] = quizCount
     }
