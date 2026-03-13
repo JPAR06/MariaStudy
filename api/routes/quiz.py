@@ -90,13 +90,13 @@ async def generate_quiz(subject_id: str, body: QuizGenerateRequest):
                     }
                     yield f"data: {json.dumps(payload)}\n\n"
                     emitted += 1
-                except Exception:
-                    pass  # skip malformed question from LLM
+                except (ValueError, KeyError, TypeError) as e:
+                    logger.debug("Skipped malformed question from LLM: %s", e)
         except LLMConfigurationError as exc:
             yield f"data: {json.dumps({'error': str(exc)})}\n\n"
             return
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Quiz generation failed: %s", e)
 
         logger.info("Quiz generation done: subject=%s topic=%s emitted=%d", subject_id, topic_label, emitted)
         yield f"data: {json.dumps({'done': True, 'total': emitted})}\n\n"

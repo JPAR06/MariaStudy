@@ -37,3 +37,31 @@ Thumbs.db
 
 # Docker
 *.pid
+
+# Test / coverage
+.pytest_cache/
+coverage/
+htmlcov/
+
+# Frontend build artifacts
+frontend/.next/
+frontend/node_modules/
+.env.local
+.env.*.local
+
+# Claude Code
+.claude/
+
+# Eval results (generated, not source)
+eval/results/
+
+# Experimental code (local only)
+experiments/
+
+# Markdown docs (private — keep README.md only)
+*.md
+*.MD
+!README.md
+
+# Stale empty dirs
+uploads/

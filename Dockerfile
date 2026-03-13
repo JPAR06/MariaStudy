@@ -20,10 +20,6 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 # Copy app code
 COPY . .
 
-EXPOSE 8502
+EXPOSE 8000
 
-CMD ["streamlit", "run", "app.py", \
-     "--server.port=8502", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true", \
-     "--server.fileWatcherType=none"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

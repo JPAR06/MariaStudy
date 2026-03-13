@@ -8,7 +8,7 @@ from typing import Callable
 import pdfplumber
 import fitz  # PyMuPDF
 
-from src.config import CHUNK_SIZE, CHUNK_OVERLAP
+from src.config import CHUNK_SIZE, CHUNK_OVERLAP, GROQ_VISION_DELAY
 
 logger = logging.getLogger(__name__)
 
@@ -45,22 +45,23 @@ def _extract_pdf(
     try:
         with pdfplumber.open(file_path) as pdf:
             fitz_doc = fitz.open(file_path)
-            n = len(pdf.pages)
+            try:
+                n = len(pdf.pages)
 
-            for i, plumber_page in enumerate(pdf.pages):
-                if progress_cb:
-                    pct = round((i / max(n, 1)) * 45, 1)
-                    progress_cb(f"Pág. {i+1}/{n}", pct)
+                for i, plumber_page in enumerate(pdf.pages):
+                    if progress_cb:
+                        pct = round((i / max(n, 1)) * 45, 1)
+                        progress_cb(f"Pág. {i+1}/{n}", pct)
 
-                page_text = _process_page(
-                    plumber_page, fitz_doc[i], caption_fn
-                )
-                if page_text.strip():
-                    chunks.extend(
-                        _chunk_text(page_text, i + 1, subject_id, filename, file_type)
+                    page_text = _process_page(
+                        plumber_page, fitz_doc[i], caption_fn
                     )
-
-            fitz_doc.close()
+                    if page_text.strip():
+                        chunks.extend(
+                            _chunk_text(page_text, i + 1, subject_id, filename, file_type)
+                        )
+            finally:
+                fitz_doc.close()
     except Exception:
         logger.exception("PDF extraction failed for %s", filename)
     return chunks
@@ -97,7 +98,7 @@ def _process_page(plumber_page, fitz_page, caption_fn) -> str:
                 caption = caption_fn(b64, ext)
                 if caption:
                     parts.append(f"[IMAGEM: {caption}]")
-                time.sleep(0.5)  # Groq vision rate limit
+                time.sleep(GROQ_VISION_DELAY)
             except Exception:
                 pass
 
@@ -149,9 +150,7 @@ def _chunk_text(text: str, page: int, subject_id: str, filename: str, file_type:
     if current_paras:
         merged.append("\n\n".join(current_paras))
 
-    # Now split any oversized merged block with a sliding word-window.
-    # We split on whitespace but reconstruct with spaces (paragraph breaks inside
-    # an oversized block are already rare — the block was one large paragraph).
+    # Split oversized blocks with a sliding word-window.
     chunks = []
     idx = 0
     for block in merged:

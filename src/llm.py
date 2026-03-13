@@ -1,8 +1,11 @@
 """Groq LLM wrapper — all prompts in European Portuguese."""
-import os
 import json
+import logging
+import os
 import time
 from groq import Groq
+
+logger = logging.getLogger(__name__)
 from src.config import LLM_REASONING, LLM_QUALITY, LLM_FAST, LLM_VISION
 
 class LLMConfigurationError(RuntimeError):
@@ -45,7 +48,7 @@ def _chat(model: str, messages: list, json_mode: bool = False, max_tokens: int =
     }
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
-    resp = _client().chat.completions.create(**kwargs)
+    resp = _client().chat.completions.create(**kwargs, timeout=30)
     return resp.choices[0].message.content or ""
 
 
@@ -98,7 +101,8 @@ def generate_flashcards(chunks: list[dict], topic: str, n: int) -> list[dict]:
     raw = _chat(LLM_QUALITY, messages, json_mode=True, max_tokens=4000)
     try:
         return json.loads(raw).get("flashcards", [])
-    except Exception:
+    except json.JSONDecodeError as e:
+        logger.warning("LLM returned invalid JSON for flashcards: %s\n%.200s", e, raw)
         return []
 
 
@@ -149,7 +153,8 @@ def generate_quiz(chunks: list[dict], topic: str, n: int, difficulty: str) -> li
     raw = _chat(LLM_QUALITY, messages, json_mode=True, max_tokens=3000)
     try:
         return json.loads(raw).get("questoes", [])
-    except Exception:
+    except json.JSONDecodeError as e:
+        logger.warning("LLM returned invalid JSON for quiz: %s\n%.200s", e, raw)
         return []
 
 

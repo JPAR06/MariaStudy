@@ -1,9 +1,13 @@
 """RAG pipeline: ingest files and answer questions with citations."""
+import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable
 
-from src.config import UPLOADS_DIR, TOP_K
+from src.config import UPLOADS_DIR, TOP_K, GROQ_RATE_LIMIT_DELAY
+
+logger = logging.getLogger(__name__)
 from src import embedder, vectorstore
 from src import llm
 from src import subjects as subject_store
@@ -23,7 +27,6 @@ def ingest_file(
     file_type: 'notes' (default) | 'exercises'
     Returns number of chunks created (0 on failure).
     """
-    # Save raw file
     dest_dir = UPLOADS_DIR / subject_id
     dest_dir.mkdir(parents=True, exist_ok=True)
     file_path = dest_dir / filename
@@ -70,7 +73,6 @@ def ingest_file(
         ),
     )
 
-    # Page count
     n_pages = max((c["metadata"]["page"] for c in chunks), default=1)
     subject_store.add_file_to_subject(subject_id, filename, n_pages, file_type)
 
@@ -180,8 +182,6 @@ def _refresh_topics_and_summary(subject_id: str):
     3. After topics are finalised, pre-compute primary_topic for every chunk
        using cosine similarity (stored embeddings — no re-embedding needed).
     """
-    import time
-
     spread_chunks = vectorstore.sample_spread(subject_id, n=40)
     if not spread_chunks:
         return
@@ -221,7 +221,8 @@ def _refresh_topics_and_summary(subject_id: str):
                 if t not in merged:
                     merged.append(t)
             extracted_topics = merged
-        except Exception:
+        except Exception as e:
+            logger.warning("LLM topic extraction failed, falling back to TOC: %s", e)
             extracted_topics = toc_topics  # use what we have even if sparse
 
     if extracted_topics:
@@ -236,11 +237,11 @@ def _refresh_topics_and_summary(subject_id: str):
     if extracted_topics:
         try:
             vectorstore.assign_topics_to_chunks(subject_id, extracted_topics)
-        except Exception:
-            pass  # Non-fatal — retrieval falls back to full hybrid search
+        except Exception as e:
+            logger.warning("Topic assignment failed (non-fatal, retrieval falls back to hybrid): %s", e)
 
     # Pause to avoid back-to-back Groq rate limit on the same model
-    time.sleep(2)
+    time.sleep(GROQ_RATE_LIMIT_DELAY)
 
     # ── Subject-level summary ──────────────────────────────────────────────
     summary_sample = " ".join(c["text"] for c in spread_chunks)
@@ -249,8 +250,8 @@ def _refresh_topics_and_summary(subject_id: str):
         summary = llm.generate_summary(summary_sample, topics=all_topics or None)
         if summary:
             subject_store.update_summary(subject_id, summary)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Summary generation failed for subject %s: %s", subject_id, e)
 
     # ── Per-topic summaries ────────────────────────────────────────────────
     for topic in extracted_topics:
@@ -261,9 +262,9 @@ def _refresh_topics_and_summary(subject_id: str):
                 topic_summary = llm.generate_topic_summary(topic, topic_text)
                 if topic_summary:
                     subject_store.update_topic_summary(subject_id, topic, topic_summary)
-            time.sleep(1)  # avoid consecutive Groq rate-limit hits
-        except Exception:
-            pass
+            time.sleep(GROQ_RATE_LIMIT_DELAY // 2)  # avoid consecutive Groq rate-limit hits
+        except Exception as e:
+            logger.warning("Per-topic summary failed for '%s': %s", topic, e)
 
 
 def search_all_subjects(question: str, subjects: list[dict], top_k: int = 3) -> list[dict]:

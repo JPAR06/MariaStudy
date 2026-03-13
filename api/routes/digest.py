@@ -3,7 +3,7 @@ Daily Digest endpoint — aggregates across all subjects.
 Cached in data/digest.json; refreshed once per day.
 """
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter

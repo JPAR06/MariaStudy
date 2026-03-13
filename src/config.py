@@ -26,3 +26,7 @@ LLM_VISION = "llama-3.2-11b-vision-preview"        # Image captions
 CHUNK_SIZE = 400    # words per chunk (approx 530 tokens)
 CHUNK_OVERLAP = 50  # words overlap between chunks
 TOP_K = 6           # chunks to retrieve for RAG
+
+# --- Rate limits (Groq free tier) ---
+GROQ_RATE_LIMIT_DELAY = 2   # seconds between 70B generation calls (post-ingest)
+GROQ_VISION_DELAY = 0.5     # seconds between vision API calls (image captions)

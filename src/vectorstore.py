@@ -1,10 +1,13 @@
 ﻿"""ChromaDB wrapper: one persistent collection per subject."""
 import json
+import logging
 import threading
 
 import chromadb
 
 from src.config import CHROMA_DIR
+
+logger = logging.getLogger(__name__)
 
 _client = None
 
@@ -102,7 +105,8 @@ def query(
             include=["documents", "metadatas", "distances"],
             where=where,
         )
-    except Exception:
+    except Exception as e:
+        logger.debug("Filtered vector query failed (%s), retrying without where-clause", e)
         results = col.query(
             query_embeddings=[query_embedding],
             n_results=min(top_k, count),
@@ -121,6 +125,8 @@ def query(
 
 
 def _rrf_merge(list1: list[dict], list2: list[dict], top_k: int, k: int = 60) -> list[dict]:
+    # Reciprocal Rank Fusion: score(d) = Σ 1/(k + rank(d) + 1), k=60 is the standard constant
+    # Combines vector and BM25 rankings without requiring score normalisation.
     rrf_scores: dict[str, float] = {}
     items: dict[str, dict] = {}
 
@@ -166,7 +172,8 @@ def hybrid_query(
     if cached is None:
         try:
             all_items = col.get(include=["documents", "metadatas"], where=where)
-        except Exception:
+        except Exception as e:
+            logger.debug("BM25 corpus filtered fetch failed (%s), using full collection", e)
             all_items = col.get(include=["documents", "metadatas"])
 
         docs = all_items.get("documents") or []
@@ -184,7 +191,7 @@ def hybrid_query(
     scores = bm25.get_scores(query_text.lower().split())
     top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k * 2]
     bm25_results = [
-        {"text": docs[i], "metadata": metas[i], "distance": 0.0}
+        {"text": docs[i], "metadata": metas[i], "distance": 0.0}  # BM25 has no distance metric; 0.0 is a sentinel
         for i in top_indices
         if scores[i] > 0
     ]
@@ -195,15 +202,16 @@ def hybrid_query(
 def delete_collection(subject_id: str):
     try:
         _get_client().delete_collection(_col_name(subject_id))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("delete_collection(%s) failed (may not exist): %s", subject_id, e)
     _invalidate_bm25(subject_id)
 
 
 def collection_count(subject_id: str) -> int:
     try:
         return get_collection(subject_id).count()
-    except Exception:
+    except Exception as e:
+        logger.debug("collection_count(%s) failed: %s", subject_id, e)
         return 0
 
 
@@ -219,7 +227,8 @@ def get_early_pages(subject_id: str, total_pages: int = 0, n: int = 20) -> list[
             all_meta = col.get(include=["metadatas"])["metadatas"]
             doc_max = max((m.get("page", 1) for m in all_meta), default=1)
             max_page = max(3, min(15, round(doc_max * 0.03)))
-        except Exception:
+        except Exception as e:
+            logger.debug("Could not determine max page for %s: %s", subject_id, e)
             max_page = 10
 
     try:
@@ -227,7 +236,8 @@ def get_early_pages(subject_id: str, total_pages: int = 0, n: int = 20) -> list[
         docs, metas = results["documents"], results["metadatas"]
         combined = sorted(zip(docs, metas), key=lambda x: (x[1].get("page", 0), x[1].get("chunk_index", 0)))
         return [{"text": d, "metadata": m} for d, m in combined[:n]]
-    except Exception:
+    except Exception as e:
+        logger.debug("get_early_pages(%s) failed: %s", subject_id, e)
         return []
 
 
@@ -275,8 +285,8 @@ def update_file_type(subject_id: str, filename: str, file_type: str):
         new_metas = [{**m, "file_type": file_type} for m in results["metadatas"]]
         col.update(ids=ids, metadatas=new_metas)
         _invalidate_bm25(subject_id)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("update_file_type(%s, %s) failed: %s", subject_id, filename, e)
 
 
 def delete_file_chunks(subject_id: str, filename: str):
@@ -284,8 +294,8 @@ def delete_file_chunks(subject_id: str, filename: str):
     try:
         col.delete(where={"file": filename})
         _invalidate_bm25(subject_id)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("delete_file_chunks(%s, %s) failed: %s", subject_id, filename, e)
 
 
 def assign_topics_to_chunks(subject_id: str, topics: list[str]) -> int:

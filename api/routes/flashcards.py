@@ -18,7 +18,7 @@ from api.schemas import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-_BATCH = 3  # cards per LLM call for streaming generation
+_BATCH = 3  # cards per LLM call — balances token usage vs. SSE streaming latency
 
 
 def _normalized_topics(topic: str, topics: list[str] | None) -> list[str]:
@@ -93,13 +93,13 @@ async def generate_flashcards(subject_id: str, body: FlashcardGenerateRequest):
                         }
                         yield f"data: {json.dumps(payload)}\n\n"
                         emitted += 1
-                    except Exception:
-                        pass
+                    except (ValueError, KeyError, TypeError) as e:
+                        logger.debug("Skipped malformed card from LLM: %s", e)
             except LLMConfigurationError as exc:
                 yield f"data: {json.dumps({'error': str(exc)})}\n\n"
                 return
-            except Exception:
-                pass  # skip failed batch
+            except Exception as e:
+                logger.warning("Flashcard batch generation failed: %s", e)
 
         logger.info("Flashcard generation done: subject=%s topic=%s emitted=%d", subject_id, topic_label, emitted)
         yield f"data: {json.dumps({'done': True, 'total': emitted})}\n\n"

@@ -1,4 +1,3 @@
-import os
 import json
 import bcrypt
 from datetime import datetime, timedelta
@@ -8,8 +7,8 @@ from fastapi import APIRouter, HTTPException
 from jose import jwt
 from pydantic import BaseModel
 
-SECRET_KEY = os.getenv("SECRET_KEY", "mariastudy-dev-secret-change-in-prod")
-ALGORITHM = "HS256"
+from api.auth import SECRET_KEY, ALGORITHM
+
 EXPIRE_DAYS = 30
 
 router = APIRouter()

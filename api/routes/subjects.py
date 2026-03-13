@@ -98,8 +98,8 @@ def refresh_summaries(subject_id: str):
                     if summary:
                         update_topic_summary(subject_id, topic, summary)
                 time.sleep(1)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Topic summary generation failed for '%s': %s", topic, e)
 
     _executor.submit(_run)
     return {"ok": True}

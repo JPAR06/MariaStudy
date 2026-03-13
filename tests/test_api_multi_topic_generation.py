@@ -38,13 +38,16 @@ def test_quiz_generate_uses_only_selected_topics(
 
     def fake_generate_quiz(chunks, topic: str, n: int, difficulty: str):
         assert "Cardio" not in {c["text"] for c in chunks}
-        return [{
-            "pergunta": f"Pergunta sobre {topic}",
-            "opcoes": ["A) 1", "B) 2", "C) 3", "D) 4"],
-            "correta": 0,
-            "explicacao": difficulty,
-            "fonte": chunks[0]["metadata"]["file"],
-        }]
+        return [
+            {
+                "pergunta": f"Pergunta sobre {topic}",
+                "opcoes": ["A) 1", "B) 2", "C) 3", "D) 4"],
+                "correta": 0,
+                "explicacao": difficulty,
+                "fonte": chunks[i % len(chunks)]["metadata"]["file"],
+            }
+            for i in range(n)
+        ]
 
     monkeypatch.setattr(subjects, "get_subject", fake_get_subject)
     monkeypatch.setattr(rag, "get_topic_chunks", fake_get_topic_chunks)
@@ -53,7 +56,7 @@ def test_quiz_generate_uses_only_selected_topics(
     res = client.post(
         f"/api/subjects/{subject_id}/quiz/generate",
         headers=auth_headers,
-        json={"topic": "Toda a UC", "topics": ["Coma", "Epilepsia"], "n": 2, "difficulty": "MÃ©dio"},
+        json={"topic": "Toda a UC", "topics": ["Coma", "Epilepsia"], "n": 2, "difficulty": "Médio"},
     )
     assert res.status_code == 200, res.text
     assert res.headers["content-type"].startswith("text/event-stream")
