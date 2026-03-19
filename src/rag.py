@@ -130,44 +130,65 @@ def ask(subject_id: str, question: str, topic_filter: str | None = None) -> dict
 def get_topic_chunks(subject_id: str, topic: str, top_k: int = 8) -> list[dict]:
     """
     Retrieve chunks relevant to a topic for flashcards/quiz.
-    Tries pre-computed primary_topic filter first (precise + fast).
-    Falls back to full hybrid search if filtered results are sparse.
-    Blends notes (explanations) + exercises (real exam questions) for richer output.
+
+    Strategy:
+    1. Hybrid search (BM25 + vector) to find seed chunks — these identify the most
+       relevant pages, not necessarily the best context by themselves.
+    2. Page-anchored expansion: find the top N pages from those seeds, then fetch ALL
+       chunks from those pages in reading order. This gives the LLM coherent, consecutive
+       passages rather than scattered fragments, and ensures page citations are accurate.
+    3. Falls back to seeds if expansion returns nothing.
     """
+    from collections import Counter
+
     emb = embedder.embed([topic])[0]
 
-    # Try pre-computed topic filter — only available after _assign_chunk_topics() runs
+    # ── Step 1: Seed retrieval ──────────────────────────────────────────────
     notes_filtered = vectorstore.hybrid_query(
         subject_id, topic, emb, top_k, file_type="notes", topic_filter=topic
     )
     exercises_filtered = vectorstore.hybrid_query(
         subject_id, topic, emb, min(4, top_k // 2), file_type="exercises", topic_filter=topic
     )
-
-    # If filtered results are rich enough, use them
     if len(notes_filtered) >= top_k // 2:
-        notes = notes_filtered
-        exercises = exercises_filtered
+        notes, exercises = notes_filtered, exercises_filtered
     else:
-        # Fall back to full unfiltered hybrid search
         notes = vectorstore.hybrid_query(subject_id, topic, emb, top_k, file_type="notes")
         exercises = vectorstore.hybrid_query(
             subject_id, topic, emb, min(4, top_k // 2), file_type="exercises"
         )
 
-    # Merge: notes first, then exercises (deduplicated by text)
-    seen = set()
-    result = []
+    seen: set[str] = set()
+    seeds: list[dict] = []
     for c in notes + exercises:
         if c["text"] not in seen:
             seen.add(c["text"])
-            result.append(c)
+            seeds.append(c)
 
-    # Fall back to unfiltered if we got nothing (old data without file_type metadata)
-    if not result:
-        result = vectorstore.hybrid_query(subject_id, topic, emb, top_k)
+    if not seeds:
+        seeds = vectorstore.hybrid_query(subject_id, topic, emb, top_k)
 
-    return result
+    # Strip very short chunks — titles, headers, cover pages (real chunks are ~400 words)
+    seeds = [c for c in seeds if len(c["text"].split()) >= 30]
+
+    # ── Step 2: Page-anchored expansion ────────────────────────────────────
+    # Count how many seeds fall on each (file, page) pair.  The most-cited pages
+    # are the most topically relevant; fetch ALL their chunks in reading order.
+    page_counts: Counter = Counter(
+        (c["metadata"]["file"], c["metadata"]["page"]) for c in seeds
+    )
+    n_pages = min(3, len(page_counts))
+    top_pages = [p for p, _ in page_counts.most_common(n_pages)]
+
+    expanded: list[dict] = []
+    seen_texts: set[str] = set()
+    for (filename, page) in top_pages:
+        for c in vectorstore.get_page_chunks_full(subject_id, filename, page):
+            if c["text"] not in seen_texts and len(c["text"].split()) >= 30:
+                seen_texts.add(c["text"])
+                expanded.append(c)
+
+    return expanded if expanded else seeds
 
 
 def _refresh_topics_and_summary(subject_id: str):

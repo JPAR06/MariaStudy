@@ -275,6 +275,23 @@ def get_page_chunks(subject_id: str, filename: str, page: int) -> list[str]:
         return []
 
 
+def get_page_chunks_full(subject_id: str, filename: str, page: int) -> list[dict]:
+    """Return all chunks (text + metadata) from a specific file+page, sorted by chunk_index."""
+    col = get_collection(subject_id)
+    try:
+        results = col.get(
+            where={"$and": [{"file": {"$eq": filename}}, {"page": {"$eq": page}}]},
+            include=["documents", "metadatas"],
+        )
+        docs = results.get("documents") or []
+        metas = results.get("metadatas") or []
+        paired = sorted(zip(docs, metas), key=lambda x: x[1].get("chunk_index", 0))
+        return [{"text": d, "metadata": m} for d, m in paired if d]
+    except Exception as e:
+        logger.debug("get_page_chunks_full failed for %s p%s: %s", filename, page, e)
+        return []
+
+
 def update_file_type(subject_id: str, filename: str, file_type: str):
     col = get_collection(subject_id)
     try:

@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { TopicChip } from "@/components/shared/TopicChip"
 import { cn, clozeHighlight, clozeToBlank } from "@/lib/utils"
+import PdfPageViewer from "@/components/PdfPageViewer"
 
 
 type StudioView =
@@ -1781,24 +1782,7 @@ function InlineFlashcardPlayer({
   const [showReference, setShowReference] = useState(false)
   const progressPct = (current / total) * 100
   const reference = parseCardReference(card.fonte)
-  // Fetch blob only when the *file* changes (not the page) so #page=N works
   const fetchUrl = reference ? `/api/files/${subjectId}/${encodeURIComponent(reference.file)}` : null
-  const [refBlobBase, setRefBlobBase] = useState<string | null>(null)
-  const [refLoadError, setRefLoadError] = useState(false)
-  useEffect(() => {
-    if (!fetchUrl) { setRefBlobBase(null); setRefLoadError(false); return }
-    let cancelled = false
-    setRefLoadError(false)
-    fetch(fetchUrl)
-      .then((r) => { if (!r.ok) throw new Error("not ok"); return r.blob() })
-      .then((blob) => { if (cancelled) return; setRefBlobBase(URL.createObjectURL(blob)) })
-      .catch(() => { if (!cancelled) setRefLoadError(true) })
-    return () => { cancelled = true; setRefBlobBase((prev) => { if (prev) URL.revokeObjectURL(prev); return null }) }
-  }, [fetchUrl])
-  // Append #page=N to blob URL so Chrome's PDF viewer navigates to the right page
-  const refBlobUrl = refBlobBase
-    ? (reference?.page ? `${refBlobBase}#page=${reference.page}` : refBlobBase)
-    : null
 
   // Source text excerpt for the reference panel
   const [sourceTexts, setSourceTexts] = useState<string[]>([])
@@ -1945,18 +1929,9 @@ function InlineFlashcardPlayer({
               </button>
             </div>
             {/* PDF viewer */}
-            <div className="relative overflow-hidden rounded-2xl border border-zinc-700/60 h-[440px]">
-              {refLoadError
-                ? <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-500 text-sm">
-                    <span>Não foi possível carregar o PDF.</span>
-                    <a href={fetchUrl ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">Abrir em nova aba ↗</a>
-                  </div>
-                : refBlobUrl
-                  ? <iframe key={refBlobUrl} title="Referência PDF" src={refBlobUrl} className="h-full w-full bg-zinc-950" />
-                  : <div className="flex h-full items-center justify-center text-zinc-500 text-sm">A carregar…</div>
-              }
-              {refBlobUrl && <a href={fetchUrl ?? "#"} target="_blank" rel="noreferrer" className="absolute bottom-2 right-2 rounded-full border border-zinc-600 bg-zinc-900/80 px-2.5 py-1 text-[10px] text-zinc-400 backdrop-blur-sm hover:text-zinc-200">↗</a>}
-            </div>
+            {fetchUrl && reference?.page && (
+              <PdfPageViewer file={fetchUrl} page={reference.page} openUrl={fetchUrl} />
+            )}
           </div>
         )}
       </motion.div>
@@ -2219,21 +2194,6 @@ function QuizPlayer({
   const correctIdx = q.correta
   const reference = parseCardReference(q.fonte)
   const fetchUrl = reference ? `/api/files/${subjectId}/${encodeURIComponent(reference.file)}` : null
-  const [refBlobBase, setRefBlobBase] = useState<string | null>(null)
-  const [refLoadError, setRefLoadError] = useState(false)
-  useEffect(() => {
-    if (!fetchUrl) { setRefBlobBase(null); setRefLoadError(false); return }
-    let cancelled = false
-    setRefLoadError(false)
-    fetch(fetchUrl)
-      .then((r) => { if (!r.ok) throw new Error("not ok"); return r.blob() })
-      .then((blob) => { if (cancelled) return; setRefBlobBase(URL.createObjectURL(blob)) })
-      .catch(() => { if (!cancelled) setRefLoadError(true) })
-    return () => { cancelled = true; setRefBlobBase((prev) => { if (prev) URL.revokeObjectURL(prev); return null }) }
-  }, [fetchUrl])
-  const refBlobUrl = refBlobBase
-    ? (reference?.page ? `${refBlobBase}#page=${reference.page}` : refBlobBase)
-    : null
 
   const [sourceTexts, setSourceTexts] = useState<string[]>([])
   const [sourceTextError, setSourceTextError] = useState<string | null>(null)
@@ -2398,18 +2358,9 @@ function QuizPlayer({
                     Abrir no Preview
                   </button>
                 </div>
-                <div className="relative overflow-hidden rounded-2xl border border-zinc-700/60 h-[440px]">
-                  {refLoadError
-                    ? <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-500 text-sm">
-                        <span>Não foi possível carregar o PDF.</span>
-                        <a href={fetchUrl ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">Abrir em nova aba ↗</a>
-                      </div>
-                    : refBlobUrl
-                      ? <iframe key={refBlobUrl} title="Referência PDF" src={refBlobUrl} className="h-full w-full bg-zinc-950" />
-                      : <div className="flex h-full items-center justify-center text-zinc-500 text-sm">A carregar…</div>
-                  }
-                  {refBlobUrl && <a href={fetchUrl ?? "#"} target="_blank" rel="noreferrer" className="absolute bottom-2 right-2 rounded-full border border-zinc-600 bg-zinc-900/80 px-2.5 py-1 text-[10px] text-zinc-400 backdrop-blur-sm hover:text-zinc-200">↗</a>}
-                </div>
+                {fetchUrl && reference?.page && (
+                  <PdfPageViewer file={fetchUrl} page={reference.page} openUrl={fetchUrl} />
+                )}
               </div>
             )}
           </motion.div>
