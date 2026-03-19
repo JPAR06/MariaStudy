@@ -1,0 +1,16 @@
+[Unit]
+Description=MariaStudy Docker Compose Stack
+Requires=docker.service tailscaled.service
+After=docker.service tailscaled.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/YOUR_USER/MariaStudy
+ExecStart=/usr/bin/docker compose -f docker-compose.tailscale.yml up -d --build
+ExecStop=/usr/bin/docker compose -f docker-compose.tailscale.yml down
+RemainAfterExit=yes
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
